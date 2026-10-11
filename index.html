@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Banner Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#161616;--panel:#202020;--line:#383838;--tx:#eee9dc;--mut:#a39e90;--ac:#c9a63a;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f1eee6;--panel:#fff;--line:#d8d3c6;--tx:#222;--mut:#6d685b;--ac:#8a6d12}}
+:root[data-theme="light"]{--bg:#f1eee6;--panel:#fff;--line:#d8d3c6;--tx:#222;--mut:#6d685b;--ac:#8a6d12}
+:root[data-theme="dark"]{--bg:#161616;--panel:#202020;--line:#383838;--tx:#eee9dc;--mut:#a39e90;--ac:#c9a63a}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:20px;margin:0 0 4px}
+p.hint{margin:0 0 16px;color:var(--mut)}
+.stage{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+canvas{display:block;width:100%;height:auto;border-radius:6px;background:#222}
+.ctrl{margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--mut)}
+input[type=text],select{background:var(--bg);color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:9px 10px;font:inherit;font-size:15px;width:100%}
+input[type=color]{width:100%;height:38px;border:1px solid var(--line);border-radius:6px;background:var(--bg);padding:2px}
+input[type=range]{width:100%;accent-color:var(--ac)}
+.row{flex-direction:row;align-items:center;gap:8px}
+.wide{grid-column:1/-1}
+input:focus-visible,select:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+</style>
+</head>
+<body>
+<main>
+<h1>Banner Editor</h1>
+<p class="hint">Ubah teks di bawah, banner 2048 × 768 langsung berubah. Untuk menyimpan: klik kanan gambar lalu "Simpan gambar" (di HP: tekan lama).</p>
+<div class="stage"><canvas id="c" width="2048" height="768" aria-label="Pratinjau banner"></canvas></div>
+<section class="ctrl">
+<label class="wide">Judul<input type="text" id="title" value="rnpproject"></label>
+<label class="wide">Subjudul<input type="text" id="sub" value="Rizky Nurahman Personal Project"></label>
+<label>Ukuran judul<input type="range" id="size" min="100" max="340" value="248"></label>
+<label class="row"><input type="checkbox" id="caps" checked> Subjudul huruf kapital</label>
+<label class="row"><input type="checkbox" id="icons" checked> Tampilkan ikon</label>
+<label class="row"><input type="checkbox" id="globe" checked> Tampilkan bola dunia</label>
+<label>Warna latar<input type="color" id="cbg" value="#222222"></label>
+<label>Warna aksen<input type="color" id="cac" value="#9c8530"></label>
+<label>Warna judul<input type="color" id="ctx" value="#f6f3eb"></label>
+<label>Warna subjudul &amp; ikon<input type="color" id="csub" value="#d9d5c7"></label>
+</section>
+</main>
+<script>
+const cv=document.getElementById('c'),g=cv.getContext('2d'),W=2048,H=768;
+const $=id=>document.getElementById(id);
+const rgba=(hex,a)=>{const n=parseInt(hex.slice(1),16);return `rgba(${n>>16},${n>>8&255},${n&255},${a})`};
+const poly=(pts,col,lw)=>{g.beginPath();pts.forEach((p,i)=>i?g.lineTo(p[0],p[1]):g.moveTo(p[0],p[1]));g.strokeStyle=col;g.lineWidth=lw;g.lineJoin='round';g.stroke()};
+const dot=(x,y,r,col)=>{g.beginPath();g.arc(x,y,r,0,7);g.fillStyle=col;g.fill()};
+const ell=(x,y,rx,ry,rot,col,lw)=>{g.beginPath();g.ellipse(x,y,rx,ry,rot||0,0,7);g.strokeStyle=col;g.lineWidth=lw;g.stroke()};
+const K=0.552;                       // skala SVG globe: 1100x560 -> 899x309 (meet)
+const GX=575+(899-1100*K)/2, GY=-10; // titik awal SVG globe
+
+function circuit(ac){
+  [0,1].forEach(m=>{
+    g.save();if(m){g.translate(W,0);g.scale(-1,1)}
+    poly([[0,110],[150,110],[230,190],[330,190]],rgba(ac,.7),1.5);
+    poly([[0,150],[110,150]],rgba(ac,.4),1);
+    poly([[0,610],[160,610],[250,520],[360,520]],rgba(ac,.7),1.5);
+    poly([[0,650],[110,650]],rgba(ac,.4),1);
+    dot(330,190,3.5,ac);dot(360,520,3.5,ac);
+    g.restore();
+  });
+}
+function globe(ac){
+  const cx=GX+550*K, cy=GY+270*K, r=200*K;
+  // orbit: gradien transparan -> aksen -> transparan
+  [[500,120,-16],[470,150,18]].forEach(o=>{
+    g.save();g.translate(cx,cy);g.rotate(o[2]*Math.PI/180);
+    const rx=o[0]*K,ry=o[1]*K,gr=g.createLinearGradient(-rx,0,rx,0);
+    gr.addColorStop(0,rgba(ac,0));gr.addColorStop(.5,rgba(ac,1));gr.addColorStop(1,rgba(ac,0));
+    g.beginPath();g.ellipse(0,0,rx,ry,0,0,7);g.strokeStyle=gr;g.lineWidth=1.4*K;g.stroke();g.restore();
+  });
+  // isi bola
+  const fy=cy-.1*2*r*1; // pusat gradien di 50%,40% dari bbox
+  const fg=g.createRadialGradient(cx,cy-r*.2,0,cx,cy-r*.2,r*1.3);
+  fg.addColorStop(0,rgba(ac,.14));fg.addColorStop(1,rgba(ac,.02));
+  g.beginPath();g.arc(cx,cy,r,0,7);g.fillStyle=fg;g.fill();
+  g.strokeStyle=rgba(ac,.95);g.lineWidth=1.5*K;g.stroke();
+  g.save();g.beginPath();g.arc(cx,cy,r,0,7);g.clip();
+  const c=rgba(ac,.55),lw=1*K;
+  ell(cx,cy,70*K,r,0,c,lw);ell(cx,cy,140*K,r,0,c,lw);
+  poly([[cx,cy-r],[cx,cy+r]],c,lw);
+  ell(cx,cy,200*K,26*K,0,c,lw);ell(cx,cy-120*K,160*K,20*K,0,c,lw);ell(cx,cy+120*K,160*K,20*K,0,c,lw);
+  g.restore();
+  dot(GX+125*K,GY+156*K,5*K,ac);dot(GX+962*K,GY+372*K,5*K,ac);
+}
+function icon(i,cx,cy,col,ac){
+  g.beginPath();g.arc(cx,cy,37.25,0,7);g.fillStyle='rgba(255,255,255,.03)';g.fill();
+  g.strokeStyle=rgba(ac,.7);g.lineWidth=1.5;g.stroke();
+  g.save();g.translate(cx-18,cy-18);g.scale(1.5,1.5);
+  g.strokeStyle=col;g.fillStyle=col;g.lineWidth=1.5;g.lineCap='round';g.lineJoin='round';
+  const ring=(x,y,r,f)=>{g.beginPath();g.arc(x,y,r,0,7);f?g.fill():g.stroke()};
+  const seg=(d)=>{g.stroke(new Path2D(d))};
+  if(i==0){ring(12,12,1.5,1);[0,60,120].forEach(d=>{g.beginPath();g.ellipse(12,12,10,4,d*Math.PI/180,0,7);g.stroke()})}
+  if(i==1){g.beginPath();g.roundRect(4,8,16,12,3);g.stroke();seg('M12 8V4');ring(12,3.4,1.2);ring(9,14,1.3,1);ring(15,14,1.3,1);seg('M2 13v3M22 13v3')}
+  if(i==2){ring(6,5,2);ring(6,19,2);ring(18,9,2);seg('M6 7v10');seg('M18 11c0 4-6 3-12 6')}
+  if(i==3){ring(12,12,9.5);g.beginPath();g.ellipse(12,12,4,9.5,0,0,7);g.stroke();seg('M2.5 12h19M4 7h16M4 17h16')}
+  g.restore();
+}
+async function draw(){
+  const bg=$('cbg').value,ac=$('cac').value,tx=$('ctx').value,sc=$('csub').value;
+  try{await Promise.all([document.fonts.load('700 100px Caveat'),document.fonts.load('26px "Courier New"')])}catch(e){}
+  g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,W,H);g.fillStyle=bg;g.fillRect(0,0,W,H);
+  // cahaya lembut di belakang globe
+  g.save();g.translate(1024,H*.32);g.scale(760,460);
+  const rg=g.createRadialGradient(0,0,0,0,0,1);
+  rg.addColorStop(0,rgba(ac,.12));rg.addColorStop(.7,rgba(bg,0));
+  g.fillStyle=rg;g.fillRect(-1024/760,-H*.32/460,W/760,H/460);g.restore();
+  if($('globe').checked)globe(ac);
+  circuit(ac);
+  // judul
+  const title=$('title').value;let size=+$('size').value;
+  const ls=n=>{if('letterSpacing' in g)g.letterSpacing=n+'px'};
+  g.textBaseline='alphabetic';g.textAlign='center';g.fillStyle=tx;
+  g.font=`700 ${size}px Caveat, cursive`;ls(-2);
+  const tw=g.measureText(title).width;
+  if(tw>1500){size*=1500/tw;g.font=`700 ${size}px Caveat, cursive`}
+  g.fillText(title,1024,232+.83*size);ls(0);
+  // subjudul: baris - teks - baris, tengah di x=1024
+  let sub=$('sub').value;if($('caps').checked)sub=sub.toUpperCase();
+  g.font='500 26px "Courier New", monospace';g.textAlign='left';
+  const sp=0.3*26,ws=[...sub].map(ch=>g.measureText(ch).width);
+  const textW=ws.reduce((a,b)=>a+b,0)+sp*(ws.length+1);
+  const gw=120+36+textW+36+120,x0=1024-gw/2,ly=508+14.7;
+  const l1=g.createLinearGradient(x0,0,x0+120,0);l1.addColorStop(0,rgba(ac,0));l1.addColorStop(1,rgba(ac,.8));
+  g.fillStyle=l1;g.fillRect(x0,ly-.5,120,1);
+  const x2=x0+gw-120,l2=g.createLinearGradient(x2,0,x2+120,0);l2.addColorStop(0,rgba(ac,.8));l2.addColorStop(1,rgba(ac,0));
+  g.fillStyle=l2;g.fillRect(x2,ly-.5,120,1);
+  g.fillStyle=sc;let x=x0+156+sp;
+  [...sub].forEach((ch,i)=>{g.fillText(ch,x,508+.833*26);x+=ws[i]+sp});
+  if($('icons').checked)[802,950,1098,1246].forEach((x,i)=>icon(i,x,636,sc,ac));
+}
+['title','sub','size','caps','icons','globe','cbg','cac','ctx','csub'].forEach(id=>$(id).addEventListener('input',draw));
+document.fonts.ready.then(draw);draw();
+</script>
+</body>
+</html>
